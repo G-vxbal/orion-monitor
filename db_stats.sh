@@ -18,15 +18,18 @@ send_telegram() {
     -d parse_mode="HTML" > /dev/null
 }
 
-# 3. 解析 URI - 提取 host 和 query string，然後加上資料庫名稱
+# 3. 解析 URI
 # MONGODB_URI = mongodb+srv://user:pass@host/?appName=xxx
 # 需要改成: mongodb+srv://user:pass@host/claw-db1?appName=xxx
 
-# 用 sed 移除 ?及其後的內容，取得 base URI
-BASE_URI=$(echo "$MONGODB_URI" | sed 's/?.*//')
-QUERY_STRING=$(echo "$MONGODB_URI" | sed 's/[^?]*//')
+# 移除 query string 取得 base
+BASE=$(echo "$MONGODB_URI" | sed 's/?.*//')
+# 移除結尾的 / (避免雙斜線)
+BASE=${BASE%/}
+# 取得 query string
+QUERY="?${MONGODB_URI##*\?}"
 
-URI_WITH_DB="${BASE_URI}/claw-db1${QUERY_STRING}"
+URI_WITH_DB="${BASE}/claw-db1${QUERY}"
 
 echo "Connecting to: claw-db1"
 
@@ -44,7 +47,6 @@ echo "$STATS"
 SZ=$(echo "$STATS" | grep '^SZ:' | cut -d: -f2)
 COLS=$(echo "$STATS" | grep '^COL:' | cut -d: -f2)
 
-# 預設值
 [ -z "$SZ" ] && SZ=0
 [ -z "$COLS" ] && COLS=0
 
