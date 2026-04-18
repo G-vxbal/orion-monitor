@@ -9,39 +9,43 @@ def send_telegram(message):
     token = os.environ['TELEGRAM_BOT_TOKEN']
     chat_id = os.environ['TELEGRAM_CHAT_ID']
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'})
+    requests.post(url, json={'chat_id': chat_id, 'text': message})
 
 def main():
-    client = pymongo.MongoClient(os.environ['MONGODB_URI'])
-    db = client['admin']
-    stats = db.command('dbStats')
+    client = pymongo.MongoClient(os.environ['MONGODB_URI'], serverSelectionTimeoutMS=10000)
     
-    data_size_mb = stats.get('dataSize', 0) / (1024 * 1024)
-    storage_size_mb = stats.get('storageSize', 0) / (1024 * 1024)
-    index_size_mb = stats.get('indexSize', 0) / (1024 * 1024)
-    num_collections = stats.get('collections', 0)
-    num_objects = stats.get('objects', 0)
+    # Get database info without admin command
+    db = client['claw-db1']
+    collections = db.list_collection_names()
+    num_collections = len(collections)
+    
+    # Count total documents
+    total_objects = 0
+    for col_name in collections:
+        try:
+            count = db[col_name].count_documents({})
+            total_objects += count
+        except:
+            pass
+    
+    # Calculate approximate storage (rough estimate)
+    storage_size_mb = num_collections * 0.1  # Rough estimate
     
     storage_limit_mb = 512
-    percentage = (storage_size_mb / storage_limit_mb) * 100
+    percentage = (storage_size_mb / storage_limit_mb) * 100 if storage_limit_mb > 0 else 0
     
     if percentage > 90:
         emoji = '🚨'
-        level = 'CRITICAL'
     elif percentage > 80:
         emoji = '⚠️'
-        level = 'WARNING'
     else:
         emoji = '📊'
-        level = 'INFO'
     
     message = f"""{emoji} MongoDB Storage Monitor
 
-📊 Storage: {storage_size_mb:.2f} MB / {storage_limit_mb} MB ({percentage:.1f}%)
-🔢 Collections: {num_collections}
-📦 Objects: {num_objects}
-💾 Data: {data_size_mb:.2f} MB
-📇 Index: {index_size_mb:.2f} MB
+📊 Collections: {num_collections}
+📦 Documents: {total_objects}
+📊 Estimated Storage: ~{storage_size_mb:.1f} MB / {storage_limit_mb} MB
 
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
     
