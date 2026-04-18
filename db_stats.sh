@@ -29,7 +29,7 @@ send_telegram() {
 
 # 4. 執行 MongoDB 狀態查詢 (指定 claw-db1 資料庫)
 DB_NAME="claw-db1"
-STATS_OUTPUT=$($MONGOSH_PATH "$MONGODB_URI/$DB_NAME" --quiet --eval "
+STATS_OUTPUT=$($MONGOSH_PATH "${MONGODB_URI%\?*}/$DB_NAME" --quiet --eval "
 const stats = db.stats();
 const storageSizeMB = (stats.storageSize / 1024 / 1024).toFixed(2);
 const dataSizeMB = (stats.dataSize / 1024 / 1024).toFixed(2);
