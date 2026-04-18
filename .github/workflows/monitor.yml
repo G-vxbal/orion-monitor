@@ -2,15 +2,14 @@ name: MongoDB Storage Monitor
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Run every hour
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
       
       - name: Setup Python
@@ -18,71 +17,12 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install dependencies
-        run: pip install pymongo python-dotenv requests
-      
-      - name: Run MongoDB Storage Monitor
+      - name: Install deps
+        run: pip install pymongo requests
+
+      - name: Monitor
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python -c "
-          import pymongo
-          import os
-          import requests
-          import json
-          from datetime import datetime
-
-          # Connect to MongoDB
-          client = pymongo.MongoClient(os.environ['MONGODB_URI'])
-          db = client['admin']
-          
-          # Get storage stats
-          stats = db.command('dbStats')
-          
-          data_size_mb = stats.get('dataSize', 0) / (1024 * 1024)
-          storage_size_mb = stats.get('storageSize', 0) / (1024 * 1024)
-          total_index_size_mb = stats.get('indexSize', 0) / (1024 * 1024)
-          num_collections = stats.get('collections', 0)
-          num_objects = stats.get('objects', 0)
-          
-          # Calculate percentage (assuming 512MB limit)
-          storage_limit_mb = 512
-          percentage = (storage_size_mb / storage_limit_mb) * 100
-          
-          # Determine alert level
-          if percentage > 90:
-            emoji = '🚨'
-            level = 'CRITICAL'
-          elif percentage > 80:
-            emoji = '⚠️'
-            level = 'WARNING'
-          else:
-            emoji = '📊'
-            level = 'INFO'
-          
-          # Send Telegram notification
-          message = f\"\"\"
-{emoji} MongoDB Storage Monitor
-
-📊 Storage Usage: {storage_size_mb:.2f} MB / {storage_limit_mb} MB ({percentage:.1f}%)
-
-🔢 Collections: {num_collections}
-📦 Objects: {num_objects}
-💾 Data Size: {data_size_mb:.2f} MB
-📇 Index Size: {total_index_size_mb:.2f} MB
-
-⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-\"\"\"
-          
-          url = f\"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage\"
-          payload = {
-              'chat_id': os.environ['TELEGRAM_CHAT_ID'],
-              'text': message,
-              'parse_mode': 'HTML'
-          }
-          
-          response = requests.post(url, json=payload)
-          print(f\"Notification sent: {response.status_code}\")
-          "
+        run: python .github/workflows/monitor.py
